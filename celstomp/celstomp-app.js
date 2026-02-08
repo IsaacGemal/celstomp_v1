@@ -6106,6 +6106,10 @@
             if (toolSeg && toolSeg.parentElement !== toolsSlot) {
                 toolsSlot.appendChild(toolSeg);
             }
+            const mainBrushSizeGroup = document.getElementById("mainBrushSizeGroup");
+            if (mainBrushSizeGroup && mainBrushSizeGroup.parentElement !== toolsSlot) {
+                toolsSlot.appendChild(mainBrushSizeGroup);
+            }
             const layerSeg = document.getElementById("layerSeg");
             if (layerSeg && layerSeg.parentElement !== layersSlot) {
                 layersSlot.appendChild(layerSeg);
