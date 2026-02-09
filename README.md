@@ -1,11 +1,9 @@
 # Celstomp
 > **Note:** this branch is rewritten without the AI - malloy
 
-
 <img width="1920" height="884" alt="image" src="https://github.com/user-attachments/assets/caa9c566-00fc-40dc-9a9c-0eac762d1bee" />
 
 > **Note:** This project was originally made with AI assistance. The code is currently being rewritten and refactored into human-written code.
-
 
 A 2D animation web application built with HTML, CSS, and JavaScript.
 
@@ -31,6 +29,16 @@ https://ginyo.space/celstomp/
 - **Safety**: Unsaved changes protection
 - **Export**: MP4 video or image sequence
 - **Save/Load**: Project files in JSON format
+
+## Credits!!
+
+| Person | Role | Links |
+|---|---|---|
+| <img src="https://github.com/ginyoa.png?size=80" width="48" height="48" style="border-radius:999px;" /> <br> **Ginyoa** | Project Lead, Creator, Concept Artist | [GitHub](https://github.com/Ginyoa) · [Website](https://ginyo.space/) |
+| <img src="https://github.com/immalloy.png?size=80" width="48" height="48" style="border-radius:999px;" /> <br> **ImMalloy** | Coder, Refactored the Site without AI | [GitHub](https://github.com/ImMalloy) · [Website](https://immalloy.nichesite.org/) · [Play Your Little Oyachi!](https://oyachigame.nichesite.org/) |
+| <img src="https://github.com/Microck.png?size=80" width="48" height="48" style="border-radius:999px;" /> <br> **Microck** | Coder, Improved reliability and UX and Fixed Bugs | [GitHub](https://github.com/Microck) |
+| <img src="https://github.com/IvBautistaS.png?size=80" width="48" height="48" style="border-radius:999px;" /> <br> **IvBautistaS** | 🎨 Design | [GitHub](https://github.com/IvBautistaS) |
+
 
 ### Key Shortcuts
 - **Tools**: 1-8
