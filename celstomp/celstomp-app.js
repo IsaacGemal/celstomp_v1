@@ -1,23 +1,5 @@
 (() => {
     "use strict";
-    function isClipEligibleMainLayer(kindOrType) {
-        const k = String(kindOrType || "").toLowerCase();
-        return k === "line" || k === "shade" || k === "color" || k === "sketch";
-    }
-    const _clipWork = document.createElement("canvas");
-    const _clipWorkCtx = _clipWork.getContext("2d");
-    const _clipMask = document.createElement("canvas");
-    const _clipMaskCtx = _clipMask.getContext("2d");
-    function ensureClipBuffers(w, h) {
-        if (_clipWork.width !== w || _clipWork.height !== h) {
-            _clipWork.width = w;
-            _clipWork.height = h;
-        }
-        if (_clipMask.width !== w || _clipMask.height !== h) {
-            _clipMask.width = w;
-            _clipMask.height = h;
-        }
-    }
     let _liveColorDialogLock = false;
     function rafThrottle(fn) {
         let queued = false;
@@ -141,23 +123,24 @@
             picker.value = norm;
         } catch {}
         if (picker._pickCleanup) picker._pickCleanup();
-        let fired = false;
-        const finish = () => {
-            if (fired) return;
-            fired = true;
+        const onInput = () => {
             const v = picker.value || norm;
+            try {
+                onPick?.(v);
+            } catch {}
+        };
+        const onChange = () => {
+            const v = picker.value || norm;
+            try {
+                onPick?.(v);
+            } catch {}
             try {
                 picker._pickCleanup?.();
             } catch {}
             try {
                 picker.blur?.();
             } catch {}
-            try {
-                onPick?.(v);
-            } catch {}
         };
-        const onInput = () => finish();
-        const onChange = () => finish();
         picker.addEventListener("input", onInput, {
             passive: true
         });
@@ -768,16 +751,10 @@
         function mainLayersTopToBottom() {
             return mainLayerOrder.slice().reverse();
         }
-        function layerBelowInOrder(L) {
-            const i = mainLayerOrder.indexOf(Number(L));
-            if (i <= 0) return null;
-            return mainLayerOrder[i - 1];
-        }
         let layers = new Array(LAYERS_COUNT).fill(0).map(() => ({
             name: "",
             opacity: 1,
             prevOpacity: 1,
-            clipToBelow: false,
             frames: new Array(totalFrames).fill(null),
             sublayers: new Map,
             suborder: []
@@ -1678,7 +1655,6 @@
             return MAIN_LAYERS.some(L => mainLayerHasContent(L, F));
         }
         function drawExactCel(ctx, idx) {
-            ensureClipBuffers(contentW, contentH);
             for (const L of mainLayerOrder) {
                 const layer = layers[L];
                 if (!layer) continue;
@@ -1686,41 +1662,9 @@
                 if (op <= 0) continue;
                 const srcCanvases = canvasesWithContentForMainLayerFrame(L, idx);
                 if (!srcCanvases.length) continue;
-                const wantsClip = !!layer.clipToBelow && isClipEligibleMainLayer(layer.name);
-                const belowL = layerBelowInOrder(L);
-                if (!wantsClip || belowL == null || !layers?.[belowL]) {
-                    ctx.save();
-                    ctx.globalAlpha *= op;
-                    for (const off of srcCanvases) ctx.drawImage(off, 0, 0);
-                    ctx.restore();
-                    continue;
-                }
-                const belowLayer = layers[belowL];
-                const belowOp = belowLayer?.opacity ?? 0;
-                if (belowOp <= 0) {
-                    continue;
-                }
-                const maskCanvases = canvasesWithContentForMainLayerFrame(belowL, idx);
-                if (!maskCanvases.length) {
-                    continue;
-                }
-                _clipWorkCtx.setTransform(1, 0, 0, 1, 0, 0);
-                _clipWorkCtx.globalCompositeOperation = "source-over";
-                _clipWorkCtx.globalAlpha = 1;
-                _clipWorkCtx.clearRect(0, 0, contentW, contentH);
-                for (const off of srcCanvases) _clipWorkCtx.drawImage(off, 0, 0);
-                _clipMaskCtx.setTransform(1, 0, 0, 1, 0, 0);
-                _clipMaskCtx.globalCompositeOperation = "source-over";
-                _clipMaskCtx.clearRect(0, 0, contentW, contentH);
-                _clipMaskCtx.globalAlpha = belowOp;
-                for (const off of maskCanvases) _clipMaskCtx.drawImage(off, 0, 0);
-                _clipMaskCtx.globalAlpha = 1;
-                _clipWorkCtx.globalCompositeOperation = "destination-in";
-                _clipWorkCtx.drawImage(_clipMask, 0, 0);
-                _clipWorkCtx.globalCompositeOperation = "source-over";
                 ctx.save();
                 ctx.globalAlpha *= op;
-                ctx.drawImage(_clipWork, 0, 0);
+                for (const off of srcCanvases) ctx.drawImage(off, 0, 0);
                 ctx.restore();
             }
         }
@@ -3107,7 +3051,7 @@
             const m = document.createElement("div");
             m.id = "layerRowMenu";
             m.hidden = true;
-            m.innerHTML = `\n        <button type="button" class="lrm-btn" data-act="opacity">Opacity…</button>\n        <button type="button" class="lrm-btn lrm-clip" data-act="clip">\n          <span class="lrm-chk" aria-hidden="true">☐</span>\n          <span class="lrm-txt">Clip to layer below</span>\n        </button>\n      `;
+            m.innerHTML = `\n        <button type="button" class="lrm-btn" data-act="opacity">Opacity…</button>\n      `;
             m.addEventListener("click", e => {
                 const b = e.target.closest("button[data-act]");
                 if (!b) return;
@@ -3118,17 +3062,6 @@
                 const L = st.L;
                 if (act === "opacity") {
                     openLayerOpacityMenu(L, st.anchorEvLike);
-                    return;
-                }
-                if (act === "clip") {
-                    if (L === PAPER_LAYER) return;
-                    if (!layers?.[L]) return;
-                    if (!isClipEligibleMainLayer(layers[L]?.name)) return;
-                    layers[L].clipToBelow = !layers[L].clipToBelow;
-                    try {
-                        updateLayerClipBadge(L);
-                    } catch {}
-                    renderAll();
                     return;
                 }
             });
@@ -3157,19 +3090,6 @@
                 L: L,
                 anchorEvLike: anchorEvLike
             };
-            const clipBtn = m.querySelector('button[data-act="clip"]');
-            const chk = clipBtn?.querySelector(".lrm-chk");
-            const eligible = isClipEligibleMainLayer(layers[L]?.name);
-            if (clipBtn) {
-                clipBtn.hidden = !eligible;
-                if (eligible) {
-                    const on = !!layers[L].clipToBelow;
-                    if (chk) chk.textContent = on ? "☑" : "☐";
-                    const hasBelow = layerBelowInOrder(L) != null;
-                    clipBtn.disabled = !hasBelow;
-                    clipBtn.title = hasBelow ? "Clip this layer to the alpha of the layer below" : "No layer below to clip to";
-                }
-            }
             m.hidden = false;
             m.style.left = "0px";
             m.style.top = "0px";
@@ -3186,14 +3106,6 @@
         function closeLayerRowMenu() {
             if (_layerRowMenu) _layerRowMenu.hidden = true;
             _layerRowState = null;
-        }
-        function updateLayerClipBadge(L) {
-            const label = document.querySelector(`[data-layer-row="${String(L)}"]`);
-            if (!label) return;
-            const on = !!layers?.[L]?.clipToBelow;
-            label.classList.toggle("isClippedToBelow", on);
-            const badge = label.querySelector(".clipBadge");
-            if (badge) badge.hidden = !on;
         }
         let _brushCtxMenu = null;
         let _brushCtxState = null;
@@ -3749,20 +3661,6 @@
             label.insertBefore(btn, label.firstChild);
             label.dataset.layerRow = String(L);
             ensureLayerMoveControls(label, L);
-            if (isClipEligibleMainLayer(layers?.[L]?.name)) {
-                let badge = label.querySelector(".clipBadge");
-                if (!badge) {
-                    badge = document.createElement("span");
-                    badge.className = "clipBadge";
-                    badge.textContent = "⛓";
-                    badge.title = "Clipped to layer below";
-                    badge.hidden = true;
-                    label.insertBefore(badge, btn.nextSibling);
-                }
-                try {
-                    updateLayerClipBadge(L);
-                } catch {}
-            }
             if (!label._opacityCtxWired) {
                 label._opacityCtxWired = true;
                 label.addEventListener("contextmenu", e => {
@@ -3789,12 +3687,6 @@
             updateVisBtn(LAYER.SHADE);
             updateVisBtn(LAYER.LINE);
             updateVisBtn(LAYER.SKETCH);
-            try {
-                updateLayerClipBadge(LAYER.COLOR);
-                updateLayerClipBadge(LAYER.SHADE);
-                updateLayerClipBadge(LAYER.LINE);
-                updateLayerClipBadge(LAYER.SKETCH);
-            } catch {}
             updateLayerMoveButtons();
         }
         function clearCelAt(L, F) {
@@ -8522,7 +8414,6 @@
                 const lay = layers?.[li];
                 const opacity = typeof lay?.opacity === "number" ? clamp(lay.opacity, 0, 1) : 1;
                 const name = String(lay?.name || "");
-                const clipToBelow = !!lay?.clipToBelow;
                 const suborder = Array.isArray(lay?.suborder) ? lay.suborder.slice() : [];
                 const keySet = new Set(suborder);
                 if (lay?.sublayers && typeof lay.sublayers.keys === "function") {
@@ -8564,7 +8455,6 @@
                 outLayers.push({
                     name: name,
                     opacity: opacity,
-                    clipToBelow: clipToBelow,
                     suborder: uniqStable(keys),
                     sublayers: outSubs
                 });
@@ -8694,7 +8584,6 @@
                         name: "",
                         opacity: 1,
                         prevOpacity: 1,
-                        clipToBelow: false,
                         frames: new Array(totalFrames).fill(null),
                         suborder: [],
                         sublayers: new Map
@@ -8751,7 +8640,6 @@
                         if (!lay || !src) continue;
                         lay.opacity = typeof src.opacity === "number" ? clamp(src.opacity, 0, 1) : 1;
                         lay.prevOpacity = lay.opacity;
-                        if ("clipToBelow" in src) lay.clipToBelow = !!src.clipToBelow;
                         if (typeof src.name === "string" && src.name.trim()) lay.name = src.name.trim();
                         if (src.sublayers && typeof src.sublayers === "object") {
                             const subsObj = src.sublayers;

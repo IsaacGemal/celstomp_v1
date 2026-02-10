@@ -290,14 +290,6 @@
   cursor: default;
 }
 
-#layerRowMenu .lrm-chk{
-  width: 1.3em;
-  display: inline-block;
-  text-align: center;
-  opacity: 0.9;
-}
-
-
 /* Onion Context Menu */
 #onionCtxMenu{
   position: fixed;
